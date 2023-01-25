@@ -29,18 +29,49 @@
     </v-sheet>
     <!-- 기능모음 -->
     <div id="room" style="width: 100%">
+      <!-- 방 그냥 나가기 -->
       <v-btn type="button" id="button-leave" @mouseup="leaveRoom">Leave room</v-btn>
+      <!-- 내 소리 온 오프 전환 -->
       <v-btn @click="setMute">소리on/off</v-btn>
+      <!-- 소리 상태 콘솔에 읽어보기 -->
       <v-btn @click="test">get소리</v-btn>
+      <!-- 내 화면 온 오프 전환 -->
       <v-btn @click="setScreen">화면on/off</v-btn>
+      <!-- 화면 상태 콘솔에 읽어보기 -->
       <v-btn @click="test2">get화면</v-btn>
+      <!-- 화면 공유 세팅 -->
       <v-btn @click="shareScreen">화면공유on/off</v-btn>
+      <!-- 참가자 이름을 불러옴.... -->
       <select v-model="selected" @click="getPeople" style="width: 100px">
         <option v-for="(item, index) in namesFromParticipants" :key="index">{{ item }}</option>
       </select>
+
+      <!-- 해당 인원 강퇴! 이건 방장기능이라 제안하지 않음 -->
       <v-btn @click="banParticipant">강퇴</v-btn>
-      <v-btn @click="keepQuiet">mute시키기</v-btn>
+      <!-- 해당 인원 mute 제안하기 -->
+      <v-btn @click="requestMute" v-bind:disabled="tempMuteBtnDisable" >mute제안</v-btn>
+      <!-- 모두다 나가기 제안하기 -->
+      <v-btn @click="requestExit" v-bind:disabled="tempExitBtnDisable">스터디 모두 종료 제안</v-btn>
     </div>
+    <!-- 우상단 알림 css 수정시에는 v-show를 true로 해주신 다음에 디자인 수정하시고, 원래대로 하시면 되겠습니다.-->
+    <div class="alarm" v-show="getIsViewAlarmDiv">
+        <v-btn @click="offViewAlarmDiv">X</v-btn>
+        <h2 v-text="getAlarmDivText"></h2>
+    </div>
+
+    <!-- 우상단 Mute투표 -->
+    <div class="alarm" v-show="getIsViewMuteDiv">
+        <h2 v-text="getMuteDivText"></h2>
+        <h3  v-text="getRemainTime"></h3>
+        <v-btn @click="muteVote(true)">Yes</v-btn><v-btn @click="muteVote(false)">No</v-btn>
+    </div>
+      <!-- 우상단 방나가기투표 -->
+    <div class="alarm" v-show="getIsViewExitDiv">
+        <h2 v-text="getExitDivText"></h2>>
+        <h3  v-text="getRemainTime"></h3>
+        <v-btn @click="exitVote(true)">Yes</v-btn><v-btn @click="exitVote(false)">No</v-btn>
+    </div>
+
   </div>
 </template>
 <script>
@@ -51,6 +82,8 @@ export default {
     return {
       namesFromParticipants: [], //이름만
       selected: "",
+      tempMuteBtnDisable: false,
+      tempExitBtnDisable:false,
     };
   },
   created() {},
@@ -58,7 +91,7 @@ export default {
     this.leave();
   },
   mounted() {
-    // 최우선
+    // 최대 참가 수 만큼 엘리먼트 정보 넣어줌. (현재 20명).  아래 addInitEl 부분은 필수
     this.addInitEl([
       this.$refs.el1,
       this.$refs.el2,
@@ -100,6 +133,13 @@ export default {
       "getScreen",
       "getParticipants",
       "getSource",
+      "getIsViewAlarmDiv",
+      "getIsViewMuteDiv",
+      "getIsViewExitDiv",
+      "getAlarmDivText",
+      "getMuteDivText",
+      "getExitDivText",
+      "getRemainTime"
     ]),
   },
   methods: {
@@ -113,8 +153,15 @@ export default {
       "isSetScreen",
       "ban",
       "mute",
+      "exit",
       "reset",
       "share",
+      "requestMuteSend",
+      "requestExitSend",
+      "setViewAlarmDiv",
+      "requestMuteSend",
+      "setIsViewMuteDiv",
+      "setIsViewExitDiv"
     ]),
     leaveRoom() {
       this.leave();
@@ -141,7 +188,7 @@ export default {
     getPeople() {
       const obj = this.getParticipants;
       console.log(obj);
-      const keys = Object.keys(obj); // ['name', 'weight', 'price', 'isFresh']
+      const keys = Object.keys(obj); // 
       this.namesFromParticipants = [];
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i]; // 각각의 키
@@ -180,6 +227,35 @@ export default {
 
       requestAnimationFrame(updateCanvas);
     },
+    offViewAlarmDiv() {
+      this.setViewAlarmDiv(false);
+    },
+    requestMute(){
+      if(this.selected == ""){
+        console.log("음소거할 사람을 선택해주세요");
+        return;
+      }
+      this.tempMuteBtnDisable = true;
+      this.requestMuteSend(this.selected);
+      setTimeout(()=>{this.tempMuteBtnDisable = false;}, 6500);//여러번 누르기를 방지하기 위함(1초의 초기화 시간 + 5초의 투표시간)
+    },
+    requestExit(){
+      this.tempExitBtnDisable = true;
+      this.requestExitSend();
+      setTimeout(()=>{this.tempExitBtnDisable = false;}, 6500);//여러번 누르기를 방지하기 위함(1초의 초기화 시간 + 5초의 투표시간)
+    },
+    muteVote(isSelected){
+      if(isSelected){
+        this.mute();
+      }
+      this.setIsViewMuteDiv(false);
+    },
+    exitVote(isSelected){
+      if(isSelected){
+        this.exit();
+      }
+      this.setIsViewExitDiv(false);
+    },
     //////////////////////////////////////////////////////
     test() {
       console.log(this.getAudio);
@@ -191,5 +267,16 @@ export default {
 };
 </script>
 
-<!-- scoped처리로 해당 컴포넌트에서만 동작하게 설정함.   -->
-<style scoped></style>
+<style scoped>
+/* 우상단 알람,방나가기,뮤트투표 기능 여기서 디자인하면 됨 */
+.alarm {
+  width:37%;
+  margin-left:60%; 
+  background-color: aqua;
+  position: absolute;
+  top:30px;
+  height: 200px;
+  z-index: 1;
+}
+
+</style>

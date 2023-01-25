@@ -1,5 +1,5 @@
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-function Participant(parents, name, receiveCallback, iceCallback) {
+//////////////////////////////////////////////////constructor 세팅 시작///////////////////////////////////////////////////////////////////////////////////////////
+function Participant(parents, name, receiveCallback, iceCallback, recovery) {
   console.log("Participant 생성");
 
   this.name = name;
@@ -17,39 +17,29 @@ function Participant(parents, name, receiveCallback, iceCallback) {
   this.getVideoElement = function () {
     return video;
   };
+  //화면 반환을 위한 receive 콜백 함수 설정
   this.offerToReceiveVideo = receiveCallback;
-  // this.offerToReceiveVideo = function (error, offerSdp, wp) {
-  //   if (error) return console.error("sdp offer error");
-  //   console.log("Invoking SDP offer callback function");
-  //   console.log(wp);
-  //   let msg = { id: "receiveVideoFrom", sender: name, sdpOffer: offerSdp };
-  //   sendMessage(msg);
-  // };
+  //ICE 세팅 ( == 어떤 서버를 통해 연결해야 가장 빠른지 판단하는 부분 Turn / Stun ..등 등 )
   this.onIceCandidate = iceCallback;
-  // this.onIceCandidate = function (candidate, wp) {
-  //   console.log("Local candidate" + JSON.stringify(candidate));
-  //   console.log(wp);
-  //   let message = {
-  //     id: "onIceCandidate",
-  //     candidate: candidate,
-  //     name: name,
-  //   };
-  //   sendMessage(message);
-  // };
-
   Object.defineProperty(this, "rtcPeer", { writable: true });
 
   this.dispose = function () {
     console.log("Disposing participant " + this.name);
     this.rtcPeer.dispose();
     parents.removeChild(video);
+    //사용한 엘리먼트 => 다시 사용할 수 있게 반환
+    recovery();
   };
 }
+//////////////////////////////////////////////////constructor 세팅 시작///////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////store 시작//////////////////////////////////////////////////////////////////
 const modulegroupcall = {
   namespaced: true,
   state: {
+    isViewAlarmDiv: false,
+    isViewExitDiv:false,
+    isViewMuteDiv:false,
     availableEl: [],
     unAvailableEl: [],
     exitURL: "/",
@@ -68,8 +58,37 @@ const modulegroupcall = {
     },
     me: null,
     source: "webcam",
+    alarmDivText: "",
+    muteDivText: "",
+    exitDivText: "",
+    requestMuteParticipant: "",
+    muteCnt : 0,
+    exitCnt : 0,
+    remainTime : 0,
+
   },
   getters: {
+    getRemainTime(state){
+      return state.remainTime;
+    },
+    getAlarmDivText(state) {
+      return state.alarmDivText;
+    },
+    getMuteDivText(state) {
+      return state.muteDivText;
+    },
+    getExitDivText(state) {
+      return state.exitDivText;
+    },
+    getIsViewAlarmDiv(state) {
+      return state.isViewAlarmDiv;
+    },
+    getIsViewExitDiv(state) {
+      return state.isViewExitDiv;
+    },
+    getIsViewMuteDiv(state) {
+      return state.isViewMuteDiv;
+    },
     getPersonName(state) {
       return state.personName;
     },
@@ -164,9 +183,34 @@ const modulegroupcall = {
     SUB_EL(state, el) {
       state.unAvailableEl.push(el);
     },
+    SET_ALARM_VIEW(state, on){
+      state.isViewAlarmDiv = on;
+    },
+    ADD_MUTE_CNT(state){
+      state.muteCnt += 1;
+    },
+    ADD_EXIT_CNT(state){
+      state.exitCnt += 1;
+    },
+    SET_MUTE_VIEW(state,on){
+      state.isViewMuteDiv = on
+    },
+    SET_EXIT_VIEW(state,on){
+      state.isViewExitDiv = on
+    },
+    SET_ALARM_TEXT(state,text){
+      state.alarmDivText = text;
+    },
+    SET_MUTE_TEXT(state,text){
+      state.muteDivText = text;
+    },
+    SET_EXIT_TEXT(state,text){
+      state.exitDivText = text;
+    },
   },
   actions: {
-    //////////////비디오 오디오 방 제어 관련 시작///////////////
+    //////////////기능 제어 관련 시작///////////////
+    //화면을 세팅할 엘리먼트 추가할 수 있는 부분
     addInitEl({ commit }, el) {
       commit("ADD_INIT_EL", el);
     },
@@ -178,28 +222,11 @@ const modulegroupcall = {
     isSetScreen({ commit }, on) {
       commit("SET_SCREEN", on);
     },
+    //webcam or desktop 중 선택
     setSource({ commit }, resource) {
       commit("SET_SOURCE", resource);
     },
-    //상대 밴 보내기
-    ban({ state, dispatch }, personName) {
-      let message = {
-        id: "ban",
-        name: personName,
-        room: state.roomName,
-      };
-      dispatch("sendMessage", message);
-    },
-    //상대 뮤트 보내기
-    mute({ state, dispatch }, personName) {
-      let message = {
-        id: "mute",
-        name: personName,
-        room: state.roomName,
-      };
-      dispatch("sendMessage", message);
-    },
-    //초기 이름 세팅
+    //초기 참가자이름 세팅
     setPersonName({ commit }, name) {
       commit("SET_PERSON_NAME", name);
     },
@@ -207,11 +234,13 @@ const modulegroupcall = {
     setRoomName({ commit }, name) {
       commit("SET_ROOM_NAME", name);
     },
+    setViewAlarmDiv({commit},on){
+      commit("SET_ALARM_VIEW", on);
+    },
     //////////////비디오 오디오 방 제어 관련 끝///////////////
 
     //////////////통신 제어 관련 시작///////////////
     open({ state, dispatch, commit }, { url, person, room }) {
-      ////////////////////////////////////////////
       commit("SET_WEBSOCKET_URL", url);
       commit("SET_WEBSOCK", new WebSocket(url));
       dispatch("setEventListener");
@@ -275,9 +304,50 @@ const modulegroupcall = {
       state.source = "desktop";
       dispatch("open", data);
     },
-
+    //상대 밴 보내기
+    ban({ state, dispatch }, personName) {
+      let message = {
+        id: "ban",
+        name: personName,
+        room: state.roomName,
+      };
+      dispatch("sendMessage", message);
+    },
+    //상대 뮤트 보내기
+    mute({ state, dispatch }) {
+      let message = {
+        id: "mute",
+        name: state.requestMuteParticipant,
+        room: state.roomName,
+      };
+      dispatch("sendMessage", message);
+    },
+    exit({ state, dispatch }) {
+      let message = {
+        id: "exit",
+        room: state.roomName,
+      };
+      dispatch("sendMessage", message);
+    },
+    requestMuteSend({state,dispatch},target){
+      let message = {
+        id: "requestMute",
+        name: target,
+        room: state.roomName,
+      };
+      dispatch("sendMessage", message);
+    },
+    requestExitSend({state,dispatch}){
+      let message = {
+        id: "requestExit",
+        room: state.roomName,
+      };
+      dispatch("sendMessage", message);
+    },
     //////////////시그널링 서버로 메세지 전달 관련 끝///////////////
 
+    
+    //////////////실질적인 RTC 데이터를 비디오로 변환하는 부분 시작///////////////
     receiveVideo({ commit, dispatch, state }, sender) {
       const receiveCallback = function (error, offerSdp, wp) {
         if (error) return console.error("sdp offer error");
@@ -327,6 +397,7 @@ const modulegroupcall = {
         }
       );
     },
+    //////////////실질적인 RTC 데이터를 비디오로 변환하는 부분 끝///////////////
 
     //////////////시그널링 서버에서 메세지 수신 관련 시작///////////////
     /*
@@ -352,6 +423,12 @@ const modulegroupcall = {
           case "receiveVideoAnswer":
             dispatch("receiveVideoResponse", parsedMessage);
             break;
+          case "requestMuteVote":
+              dispatch("requestMuteVote", parsedMessage);
+              break;
+          case "requestExitVote":
+              dispatch("requestExitVote");
+              break;
           case "iceCandidate":
             console.log("iceCandidate");
             console.log(parsedMessage);
@@ -371,6 +448,9 @@ const modulegroupcall = {
             break;
           case "mute":
             dispatch("onMute", parsedMessage);
+            break;
+          case "exit":
+            dispatch("onExit");
             break;
           default:
             console.error("Unrecognized message", parsedMessage);
@@ -438,7 +518,7 @@ const modulegroupcall = {
 
       const errFunction = function (error) {
         if (error == "shareEnd") {
-          ///////////////////////////////////공유 끝
+          
           console.log("shareENDEND");
           dispatch("reset", {
             url: state.webSockUrl,
@@ -530,6 +610,70 @@ const modulegroupcall = {
         if (error) return console.error(error);
       });
     },
+    requestMuteVote({ state,commit,dispatch }, result){
+      state.requestMuteParticipant = result.name;
+      state.muteCnt = 0;
+      commit("SET_MUTE_TEXT","["+result.name+"]님을 음소거 하시겠습니까?");
+      setTimeout(() => {
+        state.isViewMuteDiv = true;
+      }, 1000);//1초뒤에 투표화면  보여짐... because muteCnt 초기화 시간이 필요...Backend에서 할 경우, thread가 많아져서 서버 터질 확률 높음
+
+      state.remainTime = 6000;
+      let timerId = setInterval(() => {
+        state.remainTime = state.remainTime -10;
+      }, 10);//10ms마다 반복
+
+
+      const voteResult = () => {
+        const participantNum = Object.keys(state.participants).length;
+        state.isViewMuteDiv = false;  //timeout 투표 시간 지났을 경우, 화면을 끄기 위함
+        if(state.muteCnt > (participantNum/2) ){
+          dispatch("isSetAudio",false);
+          //알람으로 알려주기
+          commit("SET_ALARM_VIEW",true);
+          commit("SET_ALARM_TEXT", "["+result.name+"]님이 음소거 되셨습니다.");
+          //알람으로 알려주기
+        }else{
+          //알람으로 알려주기
+          commit("SET_ALARM_VIEW",true);
+          commit("SET_ALARM_TEXT", "["+result.name+"]님이 음소거가 거부되었습니다");
+          //알람으로 알려주기
+        }
+        clearInterval(timerId);
+      };
+
+
+      setTimeout(voteResult, 6000);
+
+    },
+    requestExitVote({ state,commit,dispatch }){
+      state.exitCnt = 0;
+      commit("SET_EXIT_TEXT","스터디를 끝내시겠습니까? ");
+
+      setTimeout(() => {
+        state.isViewExitDiv = true;
+      }, 1000);//1초뒤에 투표화면  보여짐... because muteCnt 초기화 시간이 필요...Backend에서 할 경우, thread가 많아져서 서버 터질 확률 높음
+
+      state.remainTime = 6000;
+      let timerId = setInterval(() => {
+        state.remainTime = state.remainTime -10;
+      }, 10);//10ms마다 반복
+
+
+      const voteResult = () => {
+        const participantNum = Object.keys(state.participants).length;
+        state.isViewExitDiv = false;  //timeout 투표 시간 지났을 경우, 화면을 끄기 위함
+        if(state.exitCnt > (participantNum/2) ){
+          ////////방나가기....
+          dispatch("leave");
+        }
+        clearInterval(timerId);
+      };
+
+
+      setTimeout(voteResult, 6000);
+
+    },
     //다른 사람이 나를 ban했을 때
     onBan({ state, dispatch }, request) {
       if (request.name == state.personName) {
@@ -540,19 +684,36 @@ const modulegroupcall = {
     onMute({ state, commit }, request) {
       if (request.name == state.personName) {
         console.log("mute");
-        commit("SET_AUDIO", false);
+        commit("ADD_MUTE_CNT");
       }
     },
+    onExit({ commit },) {
+        console.log("exit");
+        commit("ADD_EXIT_CNT");
+    },
+    //isViewMuteDiv
+    setIsViewMuteDiv({commit},on){
+      commit("SET_MUTE_VIEW",on);
+    },
+    //isViewMuteDiv
+    setIsViewExitDiv({commit},on){
+      commit("SET_EXIT_VIEW",on);
+    },
     //////////////시그널링 서버에서 메세지 수신 관련 끝///////////////
+
+    
+    ////////////////////////////ETC 시작/////////////////////////////
+    // 시그널링 서버로 데이터 전달
     sendMessage({ state }, message) {
       let jsonMessage = JSON.stringify(message);
       console.log("Sending message: " + jsonMessage);
       state.webSock.send(jsonMessage);
     },
-
+    // 메인화면 엘리먼트 전달
     setMainParents({ commit }, el) {
       commit("SET_MAIN_PARENTS", el);
     },
+    // 메인화면 엘리먼트로 video 화면 복사(지속적으로 복사)
     makeMainScreen({ commit, state }, main) {
       // state.mainParents 제거 부분
       while (state.mainParents.hasChildNodes()) {
@@ -575,6 +736,8 @@ const modulegroupcall = {
       requestAnimationFrame(updateCanvas);
       commit("SET_ME", main.rtcPeer);
     },
+    
+    ////////////////////////////ETC 끝/////////////////////////////
   },
 };
 export default modulegroupcall;
