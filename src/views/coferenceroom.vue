@@ -52,13 +52,19 @@
       <v-btn @click="requestMute" v-bind:disabled="tempMuteBtnDisable" >mute제안</v-btn>
       <!-- 모두다 나가기 제안하기 -->
       <v-btn @click="requestExit" v-bind:disabled="tempExitBtnDisable">스터디 모두 종료 제안</v-btn>
+      <!-- 사다리타기 생성 -->
+      <v-btn @click="onLadder">사다리타기</v-btn>
+      <!-- 채팅창 생성 -->
+      <v-btn @click="onChat">채팅창</v-btn>
+      <span v-show="getIsNewChat">‼</span>
     </div>
+
+
     <!-- 우상단 알림 css 수정시에는 v-show를 true로 해주신 다음에 디자인 수정하시고, 원래대로 하시면 되겠습니다.-->
     <div class="alarm" v-show="getIsViewAlarmDiv">
         <v-btn @click="offViewAlarmDiv">X</v-btn>
         <h2 v-text="getAlarmDivText"></h2>
     </div>
-
     <!-- 우상단 Mute투표 -->
     <div class="alarm" v-show="getIsViewMuteDiv">
         <h2 v-text="getMuteDivText"></h2>
@@ -72,12 +78,24 @@
         <v-btn @click="exitVote(true)">Yes</v-btn><v-btn @click="exitVote(false)">No</v-btn>
     </div>
 
+    <!-- 사다리 타기(중앙에 배치) -->
+    <ladder id="ladderCSS" v-if="getIsLadder"/>
+    <!--  채팅창 우측에 배치 -->
+    <coferencechat id="chatCSS" v-show="getIsChat"/>
+
   </div>
 </template>
 <script>
+import ladder from "@/views/ladder.vue";
+import coferencechat from "@/views/coferencechat.vue";
 import { mapActions, mapGetters } from "vuex";
 const modulegroupcall = "modulegroupcall";
 export default {
+  
+  components: {
+    ladder,
+    coferencechat
+  },
   data() {
     return {
       namesFromParticipants: [], //이름만
@@ -139,7 +157,10 @@ export default {
       "getAlarmDivText",
       "getMuteDivText",
       "getExitDivText",
-      "getRemainTime"
+      "getRemainTime",
+      "getIsLadder",
+      "getIsChat",
+      "getIsNewChat"
     ]),
   },
   methods: {
@@ -161,7 +182,10 @@ export default {
       "setViewAlarmDiv",
       "requestMuteSend",
       "setIsViewMuteDiv",
-      "setIsViewExitDiv"
+      "setIsViewExitDiv",
+      "setIsLadder",
+      "setIsChat",
+      "setIsNewChat"
     ]),
     leaveRoom() {
       this.leave();
@@ -256,6 +280,13 @@ export default {
       }
       this.setIsViewExitDiv(false);
     },
+    onLadder(){
+      this.setIsLadder(true);
+    },
+    onChat() {
+      this.setIsChat(true);
+      this.setIsNewChat(false);
+    },
     //////////////////////////////////////////////////////
     test() {
       console.log(this.getAudio);
@@ -276,7 +307,31 @@ export default {
   position: absolute;
   top:30px;
   height: 200px;
-  z-index: 1;
+  z-index: 2;
 }
 
+#ladderCSS {
+  margin-left:33%;
+  width:33%;
+  position: absolute;
+  z-index: 3;
+  top:300px;
+  height: 500px;
+  background-color: beige;
+}
+
+#chatCSS {
+  margin-left:66%;
+  width:33%;
+  position: absolute;
+  z-index: 1;
+  top:30px;
+  height: 800px;
+  background-color: darksalmon;
+
+}
+
+select {
+  background-color: blanchedalmond;
+}
 </style>

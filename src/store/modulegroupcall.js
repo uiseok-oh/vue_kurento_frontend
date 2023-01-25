@@ -37,11 +37,15 @@ function Participant(parents, name, receiveCallback, iceCallback, recovery) {
 const modulegroupcall = {
   namespaced: true,
   state: {
+    isChat:false,
+    isNewChat:false,
+    isLadder: false,
     isViewAlarmDiv: false,
     isViewExitDiv:false,
     isViewMuteDiv:false,
     availableEl: [],
     unAvailableEl: [],
+    chatData: [],
     exitURL: "/",
     webSockUrl: "",
     audioState: true,
@@ -68,6 +72,12 @@ const modulegroupcall = {
 
   },
   getters: {
+    getIsNewChat(state){
+      return state.isNewChat;
+    },
+    getIsLadder(state){
+      return state.isLadder;
+    },
     getRemainTime(state){
       return state.remainTime;
     },
@@ -113,6 +123,12 @@ const modulegroupcall = {
     getScreen(state) {
       return state.screenState;
     },
+    getIsChat(state){
+      return state.isChat;
+    },
+    getChatData(state){
+      return state.chatData;
+    },
   },
   mutations: {
     SET_INIT(state) {
@@ -132,6 +148,9 @@ const modulegroupcall = {
       };
       state.me = null;
       state.source = "webcam";
+    },
+    SET_CHAT_INIT(state) {
+      state.chatData = [];
     },
     SET_WEBSOCKET_URL(state, url) {
       state.webSockUrl = url;
@@ -207,6 +226,18 @@ const modulegroupcall = {
     SET_EXIT_TEXT(state,text){
       state.exitDivText = text;
     },
+    SET_LADDER_ON(state,on){
+      state.isLadder = on;
+    },
+    SET_CHAT_ON(state,on){
+      state.isChat = on;
+    },
+    ADD_CHAT_DATA(state,data){
+      state.chatData.push(data);
+    },
+    SET_NEW_CHAT(state,on){
+      state.isNewChat = on;
+    },
   },
   actions: {
     //////////////기능 제어 관련 시작///////////////
@@ -236,6 +267,15 @@ const modulegroupcall = {
     },
     setViewAlarmDiv({commit},on){
       commit("SET_ALARM_VIEW", on);
+    },
+    setIsLadder({commit},on){
+      commit("SET_LADDER_ON",on);
+    },
+    setIsChat({commit},on){
+      commit("SET_CHAT_ON",on);
+    },
+    setIsNewChat({commit},on){
+      commit("SET_NEW_CHAT",on);
     },
     //////////////비디오 오디오 방 제어 관련 끝///////////////
 
@@ -275,6 +315,7 @@ const modulegroupcall = {
       }
       state.webSock.close();
       commit("SET_INIT");
+      commit("SET_CHAT_INIT");
       window.location.href = window.location.origin + state.exitURL;
     },
     reset({ dispatch, state }, data) {
@@ -341,6 +382,26 @@ const modulegroupcall = {
       let message = {
         id: "requestExit",
         room: state.roomName,
+      };
+      dispatch("sendMessage", message);
+    },
+    sendLadderResult({state,dispatch},data){
+      for (let key in data) {
+        let message = {
+          id: "sendLadderResult",
+          name: data[key].name,
+          room: state.roomName,
+          value: data[key].value,
+        };
+        dispatch("sendMessage", message);
+      }
+    },
+    transferChatMessage({state,dispatch},text){
+      let message = {
+        id: "sendChat",
+        name: state.personName,
+        room: state.roomName,
+        message: text,
       };
       dispatch("sendMessage", message);
     },
@@ -429,7 +490,13 @@ const modulegroupcall = {
           case "requestExitVote":
               dispatch("requestExitVote");
               break;
-          case "iceCandidate":
+          case "ladderResult":
+              dispatch("receiveLadderResult",parsedMessage);
+              break;
+          case "receiveChatMessage":
+              dispatch("receiveChatMessage",parsedMessage);
+              break;
+          case "iceCandidate"://receiveChatMessage
             console.log("iceCandidate");
             console.log(parsedMessage);
             console.log(state.participants);
@@ -673,6 +740,25 @@ const modulegroupcall = {
 
       setTimeout(voteResult, 6000);
 
+    },
+    receiveLadderResult({commit, state},result){
+      console.log("receiveLadderResult");
+      console.log(result);
+      let value = result.value;
+      
+      commit("SET_ALARM_VIEW",true);
+      commit("SET_ALARM_TEXT", "["+state.personName+"]님은 ("+value+")에 담청되셨습니다");
+
+    },
+    receiveChatMessage({commit,state},result){
+      const data = {
+        name : result.name,
+        message : result.message,
+      };
+
+      commit("ADD_CHAT_DATA",data);
+      if(!state.isChat)
+        commit("SET_NEW_CHAT",true);
     },
     //다른 사람이 나를 ban했을 때
     onBan({ state, dispatch }, request) {

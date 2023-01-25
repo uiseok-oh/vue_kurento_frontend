@@ -56,7 +56,3 @@ export default {
 };
 </script>
 
-<!-- scoped처리로 해당 컴포넌트에서만 동작하게 설정함.   -->
-<style scoped>
-/* @import  "@/folder/style.css"; */
-</style>
