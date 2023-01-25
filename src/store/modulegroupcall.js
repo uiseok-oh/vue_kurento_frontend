@@ -700,11 +700,6 @@ const modulegroupcall = {
           commit("SET_ALARM_VIEW",true);
           commit("SET_ALARM_TEXT", "["+result.name+"]님이 음소거 되셨습니다.");
           //알람으로 알려주기
-        }else{
-          //알람으로 알려주기
-          commit("SET_ALARM_VIEW",true);
-          commit("SET_ALARM_TEXT", "["+result.name+"]님이 음소거가 거부되었습니다");
-          //알람으로 알려주기
         }
         clearInterval(timerId);
       };
