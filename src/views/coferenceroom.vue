@@ -57,6 +57,7 @@
       <!-- 채팅창 생성 -->
       <v-btn @click="onChat">채팅창</v-btn>
       <span v-show="getIsNewChat">‼</span>
+      <v-btn @click="showEditor">에디터</v-btn>
     </div>
 
 
@@ -71,19 +72,21 @@
         <h3  v-text="getRemainTime"></h3>
         <v-btn @click="muteVote(true)">Yes</v-btn><v-btn @click="muteVote(false)">No</v-btn>
     </div>
-      <!-- 우상단 방나가기투표 -->
+    <!-- 우상단 방나가기투표 -->
     <div class="alarm" v-show="getIsViewExitDiv">
         <h2 v-text="getExitDivText"></h2>>
         <h3  v-text="getRemainTime"></h3>
         <v-btn @click="exitVote(true)">Yes</v-btn><v-btn @click="exitVote(false)">No</v-btn>
     </div>
+   
+    
 
     <!-- 사다리 타기(중앙에 배치) -->
     <ladder id="ladderCSS" v-if="getIsLadder"/>
     <!--  채팅창 우측에 배치 -->
     <coferencechat id="chatCSS" v-show="getIsChat"/>
     <!-- code editor  -->
-    <CodeEditor v-model="codeContetnt" :language_selector="true" :languages="[['javascript', 'JS'],['python', 'Python'],['cpp', 'c++'],['java','Java']]"></CodeEditor>
+    <CodeEditor class="leftArrange" height="800px" v-show="isShowEditor" v-model="codeContent" :language_selector="true" :languages="[['javascript', 'JS'],['python', 'Python'],['cpp', 'c++'],['java','Java']]"></CodeEditor>
 
   </div>
 </template>
@@ -92,8 +95,22 @@ import ladder from "@/views/ladder.vue";
 import coferencechat from "@/views/coferencechat.vue";
 import { mapActions, mapGetters } from "vuex";
 import CodeEditor from 'simple-code-editor';
-
 const modulegroupcall = "modulegroupcall";
+
+
+function debounce(fn, delay) {
+  var timeoutID = null
+  return function () {
+    clearTimeout(timeoutID)
+    var args = arguments
+    var that = this
+    timeoutID = setTimeout(function () {
+      fn.apply(that, args)
+    }, delay)
+  }
+}
+
+
 export default {
   
   components: {
@@ -103,22 +120,24 @@ export default {
   },
   data() {
     return {
+      isShowEditor:false,
       namesFromParticipants: [], //이름만
       selected: "",
       tempMuteBtnDisable: false,
       tempExitBtnDisable:false,
-      codeContetnt:"",
     };
   },
   created() {
     this.setPersonName(localStorage.getItem("studyRoomPersonName"));//실제로 회원 닉네임을 전달해주면 됨.
     this.setRoomName(localStorage.getItem("studyRoomRoomName"));//해당 스터디방 seq값을 전달해주면 됨.
+    this.setCodeEditor(this.codeContent);
   },
   beforeDestroy() {
     this.leave();
   },
   mounted() {
     // 최대 참가 수 만큼 엘리먼트 정보 넣어줌. (현재 20명).  아래 addInitEl 부분은 필수
+    window.addEventListener('beforeunload', this.leaveRoom)
     this.addInitEl([
       this.$refs.el1,
       this.$refs.el2,
@@ -153,6 +172,13 @@ export default {
     this.open(data);
     
   },
+ 
+ 
+  beforeUnmount() {
+	  window.removeEventListener('beforeunload', this.leaveRoom)
+  },
+  
+
 
   computed: {
     ...mapGetters(modulegroupcall, [
@@ -171,8 +197,15 @@ export default {
       "getRemainTime",
       "getIsLadder",
       "getIsChat",
-      "getIsNewChat"
+      "getIsNewChat",
+      "getCodeEditor"
     ]),
+    codeContent: {
+      get () {
+        return this.getCodeEditor;
+      },
+      set:  debounce(function (newValue) { this.sendCode(newValue); }, 400),
+    }
   },
   methods: {
     ...mapActions(modulegroupcall, [
@@ -198,8 +231,16 @@ export default {
       "setIsChat",
       "setIsNewChat",
       "setPersonName",
-       "setRoomName"
+       "setRoomName",
+       "setCodeEditor",
+       "sendCode"
     ]),
+    showEditor(){
+      if(this.isShowEditor)
+        this.isShowEditor=false;
+      else
+        this.isShowEditor=true;
+    },
     leaveRoom() {
       this.leave();
     },
@@ -320,6 +361,16 @@ export default {
   position: absolute;
   top:30px;
   height: 200px;
+  z-index: 2;
+}
+
+.leftArrange{
+  width:37%;
+  margin-left:5%; 
+  margin-right:58%; 
+  position: absolute;
+  top:30px;
+  height: 800px;
   z-index: 2;
 }
 

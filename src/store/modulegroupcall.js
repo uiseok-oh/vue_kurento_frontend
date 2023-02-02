@@ -69,9 +69,13 @@ const modulegroupcall = {
     muteCnt : 0,
     exitCnt : 0,
     remainTime : 0,
+    codeEditor : ""
 
   },
   getters: {
+    getCodeEditor(state){
+      return state.codeEditor;
+    },
     getIsNewChat(state){
       return state.isNewChat;
     },
@@ -151,6 +155,13 @@ const modulegroupcall = {
     },
     SET_CHAT_INIT(state) {
       state.chatData = [];
+    },
+    SET_CODE_EDITOR(state,data) {
+      state.codeEditor = data;
+    },
+    SEND_CODE(state,data){
+      state.me.send(data);
+      state.codeEditor=data;
     },
     SET_WEBSOCKET_URL(state, url) {
       state.webSockUrl = url;
@@ -240,6 +251,16 @@ const modulegroupcall = {
     },
   },
   actions: {
+
+
+    ////코드에디터관련////
+    setCodeEditor({commit},data){
+      commit("SET_CODE_EDITOR",data);
+    },
+    sendCode({commit},data){
+      if(data !='')
+        commit("SEND_CODE", data);
+    },
     //////////////기능 제어 관련 시작///////////////
     //화면을 세팅할 엘리먼트 추가할 수 있는 부분
     addInitEl({ commit }, el) {
@@ -442,11 +463,22 @@ const modulegroupcall = {
       commit("SET_PARTICIPANTS", { key: sender, participants: participant }); // key, participants
       let video = participant.getVideoElement();
 
+      const onMessage = function (event) {
+        console.log(event);
+        commit("SET_CODE_EDITOR",event["data"]);
+      };
+
       let options = {
         remoteVideo: video,
         // onicecandidate: participant.onIceCandidate.bind(participant),
         onicecandidate: iceCallback,
+        dataChannelConfig: {
+          id :state.roomName,
+          onmessage : onMessage,
+        },
+			  dataChannels : true,
       };
+
 
       participant.rtcPeer = new window.kurentoUtils.WebRtcPeer.WebRtcPeerRecvonly(
         options,
@@ -574,13 +606,20 @@ const modulegroupcall = {
       );
       state.participants[state.personName] = participant;
       let video = participant.getVideoElement();
-
+     
+    
       let options = {
         localVideo: video,
         mediaConstraints: constraints,
-        // onicecandidate: participant.onIceCandidate.bind(participant),
         onicecandidate: iceCallback,
         sendSource: state.source,
+        dataChannelConfig: {
+          id : state.roomName,
+          onmessage : function (event) {
+            commit("SET_CODE_EDITOR",event["data"]);
+          },
+        },
+        dataChannels : true,
       };
 
       const errFunction = function (error) {
@@ -600,7 +639,7 @@ const modulegroupcall = {
         this.generateOffer(participant.offerToReceiveVideo.bind(participant));
       };
 
-      participant.rtcPeer = new window.kurentoUtils.WebRtcPeer.WebRtcPeerSendonly(
+      participant.rtcPeer = new window.kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(
         options,
         errFunction
       );
@@ -639,10 +678,19 @@ const modulegroupcall = {
         commit("SET_PARTICIPANTS", { key: sender, participants: participant }); //// key, participants
         let video = participant.getVideoElement();
 
+        
+
         let options = {
           remoteVideo: video,
           onicecandidate: participant.onIceCandidate.bind(participant),
           //onicecandidate: iceCallback,
+          dataChannelConfig: {
+            id :state.roomName,
+            onmessage : function (event) {
+              commit("SET_CODE_EDITOR",event["data"]);
+            },
+          },
+			    dataChannels : true,
         };
 
         participant.rtcPeer = new window.kurentoUtils.WebRtcPeer.WebRtcPeerRecvonly(
