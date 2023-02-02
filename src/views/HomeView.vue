@@ -45,8 +45,8 @@ export default {
   methods: {
     ...mapActions(modulegroupcall, ["setPersonName", "setRoomName"]),
     register() {
-      this.setPersonName(this.person);//실제로 회원 닉네임을 전달해주면 됨.
-      this.setRoomName(this.room);//해당 스터디방 seq값을 전달해주면 됨.
+      localStorage.setItem("studyRoomPersonName", this.person);
+      localStorage.setItem("studyRoomRoomName", this.room);
       this.$router.push("/coferenceroom");
     },
   },

@@ -82,6 +82,8 @@
     <ladder id="ladderCSS" v-if="getIsLadder"/>
     <!--  채팅창 우측에 배치 -->
     <coferencechat id="chatCSS" v-show="getIsChat"/>
+    <!-- code editor  -->
+    <CodeEditor v-model="codeContetnt" :language_selector="true" :languages="[['javascript', 'JS'],['python', 'Python'],['cpp', 'c++'],['java','Java']]"></CodeEditor>
 
   </div>
 </template>
@@ -89,12 +91,15 @@
 import ladder from "@/views/ladder.vue";
 import coferencechat from "@/views/coferencechat.vue";
 import { mapActions, mapGetters } from "vuex";
+import CodeEditor from 'simple-code-editor';
+
 const modulegroupcall = "modulegroupcall";
 export default {
   
   components: {
     ladder,
-    coferencechat
+    coferencechat,
+    CodeEditor
   },
   data() {
     return {
@@ -102,9 +107,13 @@ export default {
       selected: "",
       tempMuteBtnDisable: false,
       tempExitBtnDisable:false,
+      codeContetnt:"",
     };
   },
-  created() {},
+  created() {
+    this.setPersonName(localStorage.getItem("studyRoomPersonName"));//실제로 회원 닉네임을 전달해주면 됨.
+    this.setRoomName(localStorage.getItem("studyRoomRoomName"));//해당 스터디방 seq값을 전달해주면 됨.
+  },
   beforeDestroy() {
     this.leave();
   },
@@ -132,6 +141,7 @@ export default {
       this.$refs.el19,
       this.$refs.el20,
     ]);
+    
 
     this.setMainParents(this.$refs.main);
     this.setSource("webcam");
@@ -141,6 +151,7 @@ export default {
       room: this.getRoomName,
     };
     this.open(data);
+    
   },
 
   computed: {
@@ -185,7 +196,9 @@ export default {
       "setIsViewExitDiv",
       "setIsLadder",
       "setIsChat",
-      "setIsNewChat"
+      "setIsNewChat",
+      "setPersonName",
+       "setRoomName"
     ]),
     leaveRoom() {
       this.leave();
